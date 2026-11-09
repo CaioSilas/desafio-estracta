@@ -1,0 +1,35 @@
+<!--
+  FIXTURE SINTETICA - reducao da pagina consultaBa.asp (observada em 11/2026),
+  servida em ISO-8859-1. Mantem o aninhamento invalido <table><form><tr> do original
+  e as tres modalidades de consulta (CNPJ, CPF e IE).
+-->
+<html>
+<head><title>sefaz.ba :: Consulta</title></head>
+<body>
+<table width="450" border=0 align="center" class="conteudo">
+  <form action="result.asp" method="post">
+    <tr>
+      <td align=left colspan="5">
+        <input type=hidden name=sefp value=1>
+        <input type=hidden name="estado" value="BA">
+        Entre com uma das op&ccedil;&otilde;es de consulta:</td>
+    </tr>
+    <tr>
+      <td align=left colspan="2">CNPJ:</td>
+      <td><input size="18" maxlength="14" name="CGC" class="input"></td>
+      <td><input type="submit" name="B1" value="CNPJ  -&gt;" class="botao"></td>
+    </tr>
+    <tr>
+      <td align=left>CPF:</td>
+      <td><input name="CPF" size="18" class="input" maxlength="11"></td>
+      <td><input type="submit" value="CPF -&gt;" name="B3" class="botao"></td>
+    </tr>
+    <tr>
+      <td align=left colspan="2">Inscri&ccedil;&atilde;o Estadual:</td>
+      <td><input size="18" maxlength="14" name="IE" class="input"></td>
+      <td><input type="submit" name="B2" value="IE  -&gt;" class="botao"></td>
+    </tr>
+  </form>
+</table>
+</body>
+</html>

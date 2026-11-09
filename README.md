@@ -93,3 +93,67 @@ Todos os testes entregues serão analisados e receberão uma devolutiva no resul
 
 O candidato deve escrever um texto livre explicando como desenvolveu a aplicação, incluindo sua abordagem, decisões técnicas, dificuldades e aprendizados. Serão consideradas a clareza da explicação, a fundamentação das decisões e a coerência com a implementação entregue.
 
+---
+
+## Implementação
+
+### Fluxo da consulta no portal
+
+Levantado inspecionando o formulário e as respostas reais (11/2026):
+
+1. `GET consultaBa.asp` devolve o formulário (ISO-8859-1) e abre a sessão ASP (cookie `ASPSESSIONID…`).
+2. `POST result.asp` com `sefp=1`, `estado=BA`, `CGC=<CNPJ sem máscara>` e o botão `B1`. Os campos `CPF` e `IE` pertencem a outras modalidades e não são enviados.
+3. Respostas possíveis:
+   - cadastro encontrado: `200` com a página de dados (UTF-8, sem charset no cabeçalho HTTP);
+   - sem cadastro: `302` para `contribuinte/consultas/consulta_vazia.htm` ("Nenhum registro encontrado");
+   - dígito verificador inválido: `302` para `contribuinte/consultas/cnpj_incorreto.htm`.
+
+Os campos ocultos, o método e o destino são lidos do próprio formulário a cada consulta ([FormularioConsulta](src/Extracao/FormularioConsulta.php)). Se o campo de CNPJ desaparecer, a consulta para com `RespostaInesperadaException` antes de enviar dados.
+
+### Organização
+
+| Camada | Classes | Responsabilidade |
+| --- | --- | --- |
+| Orquestração | [SefazBaSpider](src/Spider/SefazBaSpider.php) | Fluxo da consulta, classificação das respostas e conferência do CNPJ retornado |
+| Transporte | [HttpTransport](src/Http/HttpTransport.php), [GuzzleTransport](src/Http/GuzzleTransport.php), [TransporteComTentativas](src/Http/TransporteComTentativas.php) | HTTP substituível; sessão por cookies, tempo limite (20 s; 10 s para conectar), máx. 3 redirecionamentos e até 3 tentativas só para falhas recuperáveis |
+| Extração | [Html](src/Extracao/Html.php), [ExtratorCadastro](src/Extracao/ExtratorCadastro.php) | Decodificação de caracteres, normalização de texto e mapeamento para `CadastroContribuinte` |
+
+### Mapeamento dos campos
+
+| Propriedade | Origem na página | Transformação |
+| --- | --- | --- |
+| `inscricaoEstadual` | Dados da empresa › Inscrição Estadual | Somente dígitos (`000.478.696 NO (Inscrição Única)` → `000478696`) |
+| `cnpj` | Dados da empresa › CNPJ | Somente dígitos; precisa ter 14 e coincidir com o consultado |
+| `razaoSocial` | Dados da empresa › Razão Social | Espaços normalizados |
+| `nomeFantasia` | Dados da empresa › Nome Fantasia | Espaços normalizados |
+| `situacaoCadastral` | Informações Complementares › Situação Cadastral Vigente | Espaços normalizados |
+| `endereco` | Endereço do estabelecimento (Logradouro, Número, Complemento, Bairro/Distrito, Município, UF, CEP) | `LOGRADOURO, NÚMERO, COMPLEMENTO - BAIRRO - MUNICÍPIO/UF - CEP 00000-000`, omitindo partes ausentes |
+| `atividadeEconomica` | Informações Complementares › Atividade Econômica Principal | Código e descrição como publicados |
+| `regimeApuracao` | Informações Complementares › Forma de pagamento | Como publicado (ex.: `C/CORRENTE FISCAL`, `SIMPLES NACIONAL`) |
+
+Os rótulos são indexados pela seção da página, pois Endereço, Município, CEP e até CNPJ se repetem nas seções de correspondência e do contador. Campos vazios ou ausentes viram `null`.
+
+### Erros
+
+Todas as exceções da consulta estendem `ConsultaException`:
+
+| Situação | Exceção |
+| --- | --- |
+| CNPJ com formato inválido (validação local) | `InvalidArgumentException` (de `Consulta`) |
+| Portal rejeita o CNPJ (dígito verificador) | `EntradaInvalidaException` |
+| Sem cadastro | `CadastroNaoEncontradoException` |
+| Conexão recusada, DNS, tempo limite, HTTP 502/503/504 | `PortalIndisponivelException` (após até 3 tentativas) |
+| Outro status HTTP de erro, falha TLS, excesso de redirecionamentos | `FalhaHttpException` (com `status`, quando houver) |
+| Página sem a estrutura esperada ou com outro CNPJ | `RespostaInesperadaException` |
+
+### Testes
+
+- `composer test`: suíte padrão (`tests/Unit`), sem acesso à rede. Usa um transporte falso ([TransporteFalso](tests/Support/TransporteFalso.php)), o `MockHandler` do Guzzle e fixtures sintéticas em [tests/Fixtures/sefaz-ba](tests/Fixtures/sefaz-ba).
+- `composer test:integracao`: opcional, consulta o portal real. Os testes são ignorados se `SEFAZ_BA_CNPJ` não estiver definido:
+
+  ```bash
+  SEFAZ_BA_CNPJ=<cnpj cadastrado na Bahia> composer test:integracao
+  ```
+
+O `composer.lock` é resolvido para PHP 8.1 (`config.platform.php`), garantindo dependências compatíveis com o requisito mínimo.
+
