@@ -4,7 +4,11 @@
     "type": "project",
     "license": "proprietary",
     "require": {
-        "php": "^8.1"
+        "php": "^8.1",
+        "ext-dom": "*",
+        "ext-libxml": "*",
+        "ext-mbstring": "*",
+        "guzzlehttp/guzzle": "^7.9"
     },
     "require-dev": {
         "pestphp/pest": "^2.36"
@@ -12,6 +16,9 @@
     "config": {
         "allow-plugins": {
             "pestphp/pest-plugin": true
+        },
+        "platform": {
+            "php": "8.1.0"
         }
     },
     "autoload": {
@@ -19,8 +26,14 @@
             "ProvaSpider\\": "src/"
         }
     },
+    "autoload-dev": {
+        "psr-4": {
+            "ProvaSpider\\Tests\\": "tests/"
+        }
+    },
     "scripts": {
-        "test": "pest",
+        "test": "pest --testsuite=Unit",
+        "test:integracao": "pest --testsuite=Integracao",
         "consultar": "@php bin/consultar.php"
     }
 }
